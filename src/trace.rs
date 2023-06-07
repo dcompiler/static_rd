@@ -1,20 +1,18 @@
 use v3pluss::loop_tree::*;
+use v3pluss::arybase::set_arybase;
 use lru_stack::LRUStack;
 use hist::Hist;
 use std::rc::Rc;
 
-// Handling a single array ONLY.
 fn access2addr(ary_ref: &AryRef, ivec: &Vec<i32>) -> usize {
-    // let ary_initial: usize = (string_to_decimals(&ary_ref.name).unwrap())[0] as usize;
-    // let base = ary_initial * MAX_ARRAY;
-    
+
     let ary_index = (ary_ref.sub)(ivec);
     if ary_index.len() != ary_ref.dim.len() { panic!("array index and dimension do not match"); }
     
     let offset = ary_index.iter().zip(ary_ref.dim.iter())
 	.fold(0, |acc, (&i, &d)| acc*d + i);
     
-    return offset;
+    return ary_ref.base.unwrap() + offset;
 }
 
 fn trace_rec(code: &Rc<LoopTNode>, ivec: &Vec<i32>, sim: &mut LRUStack<usize>, hist: &mut Hist) {
@@ -40,9 +38,11 @@ fn trace_rec(code: &Rc<LoopTNode>, ivec: &Vec<i32>, sim: &mut LRUStack<usize>, h
     }
 }
 
-pub fn trace(code: &Rc<LoopTNode>) -> Hist {
+pub fn trace(code: &mut Rc<LoopTNode>) -> Hist {
     let mut sim = LRUStack::<usize>::new();
     let mut hist = Hist::new();
+    set_arybase( code );
+    println!("{:?}", code);
     trace_rec(code, &Vec::<i32>::new(), &mut sim, &mut hist);
     hist
 }
@@ -53,8 +53,10 @@ mod test {
 
     #[test]
     fn test_access2addr() {
-	let aij_node = LoopTNode::new_ref("x", vec![10,10],
-					  |ij| vec![ij[0] as usize, ij[1] as usize]);
+	let mut aij_node = LoopTNode::new_ref("x", vec![10,10],
+					      |ij| vec![ij[0] as usize, ij[1] as usize]);
+	let mutable = unsafe{ Rc::get_mut_unchecked( &mut aij_node ) };
+	*mutable.ref_only_mut_ref( |a| &mut a.base ).unwrap() = Some(0);
 	if let Stmt::Ref(aij) = &aij_node.stmt {
 	    assert_eq!(access2addr(&aij, &vec![0,0]), 0);
 	    assert_eq!(access2addr(&aij, &vec![9,9]), 99);
@@ -67,10 +69,10 @@ mod test {
         // i = 0, n { a[i] }
         let aref = LoopTNode::new_ref("A", vec![10],
 				      |i| vec![i[0] as usize]);
-        let aloop = LoopTNode::new_single_loop("i", 0, 10);
+        let mut aloop = LoopTNode::new_single_loop("i", 0, 10);
         LoopTNode::extend_loop_body(&aloop, &aref);
 
-	let hist = trace(&aloop);
+	let hist = trace(&mut aloop);
 	assert_eq!(hist.to_vec()[0], (None, 10));
 	println!("{}", hist);	
     }
@@ -80,27 +82,12 @@ mod test {
 
         // i = 0, n { a[0] }
         let aref = LoopTNode::new_ref("A", vec![1], |_| vec![0]);
-        let aloop = LoopTNode::new_single_loop("i", 0, 10);
+        let mut aloop = LoopTNode::new_single_loop("i", 0, 10);
         LoopTNode::extend_loop_body(&aloop, &aref);
 
-	let hist = trace(&aloop);
+	let hist = trace(&mut aloop);
 	assert_eq!(hist.to_vec()[0], (Some(1), 9));
 	assert_eq!(hist.to_vec()[1], (None, 1));
 	println!("{}", hist);	
     }
 }
-
-
-// fro each array ref, calute adreaa
-// for all the create, we can just add the call.
-
-
-// In the unite test, add loop for one reference and check correctness.
-
-//  How do we do sampling once we have trace?  ----> sampler.rs.
-
-
-
-// For each reference, we get a loop node.
-//
-// for each sample, we get to the refer for that loop interation,
