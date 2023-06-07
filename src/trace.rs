@@ -64,7 +64,7 @@ mod test {
     #[test]
     fn loop_a_i() {
 
-        // i = 0, n { a[i] }
+        // i = 0, 10 { a[i] }
         let aref = LoopTNode::new_ref("A", vec![10],
 				      |i| vec![i[0] as usize]);
         let aloop = LoopTNode::new_single_loop("i", 0, 10);
@@ -78,7 +78,7 @@ mod test {
     #[test]
     fn loop_a_0() {
 
-        // i = 0, n { a[0] }
+        // i = 0, 10 { a[0] }
         let aref = LoopTNode::new_ref("A", vec![1], |_| vec![0]);
         let aloop = LoopTNode::new_single_loop("i", 0, 10);
         LoopTNode::extend_loop_body(&aloop, &aref);
