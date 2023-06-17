@@ -8,5 +8,5 @@ edition = "2021"
 [dependencies]
 lru_stack = { path = "../stack_alg_sim/lru_stack"}
 hist = { path = "../stack_alg_sim/hist" }
-v3pluss = { path = "../v3pluss" }
+dace = { path = "../dace/dace" }
 
