@@ -1,8 +1,12 @@
 use dace::ast::{Node, Stmt, LoopBound, AryRef};
 use dace::arybase::set_arybase;
 use lru_stack::LRUStack;
+use lru_vec::LRUVec;
+use lru_trait::LRU;
 use hist::Hist;
 use std::rc::Rc;
+use list_serializable::list_accesses;
+
 
 fn access2addr(ary_ref: &AryRef, ivec: &Vec<i32>) -> usize {
 
@@ -15,11 +19,12 @@ fn access2addr(ary_ref: &AryRef, ivec: &Vec<i32>) -> usize {
     return ary_ref.base.unwrap() + offset;
 }
 
-fn trace_rec(code: &Rc<Node>, ivec: &Vec<i32>, sim: &mut LRUStack<usize>, hist: &mut Hist) {
+fn trace_rec(code: &Rc<Node>, ivec: &Vec<i32>, sim: &mut Box<dyn LRU<usize>>, hist: &mut Hist, data_accesses: &mut list_accesses) {
     match &code.stmt {
 	Stmt::Ref(ary_ref) => {let addr = access2addr(&ary_ref, &ivec);
-			       let rd = sim.rec_access_impl(addr);
-			       hist.add_dist(rd);},
+				data_accesses.add(addr);
+			    let rd = sim.rec_access(addr);
+			    hist.add_dist(rd);},
 	Stmt::Loop(aloop) => {
 	    if let LoopBound::Fixed(lb) = aloop.lb {
 		if let LoopBound::Fixed(ub) = aloop.ub {
@@ -29,22 +34,28 @@ fn trace_rec(code: &Rc<Node>, ivec: &Vec<i32>, sim: &mut LRUStack<usize>, hist: 
 			    |stmt| {
 				let mut myvec = ivec.clone();
 				myvec.push(i);
-				trace_rec(stmt, &myvec, sim, hist) })})
+				trace_rec(stmt, &myvec, sim, hist, data_accesses) })})
 		}
 		else {panic!("dynamic loop upper bound is not supported")}
 	    }
 	    else {panic!("dynamic loop lower bound is not supported")}
 	},
-	Stmt::Block(blk) => blk.iter().for_each( |s| trace_rec(s, &ivec.clone(), sim, hist) )
+	Stmt::Block(blk) => blk.iter().for_each( |s| trace_rec(s, &ivec.clone(), sim, hist, data_accesses) )
     }
 }
 
-pub fn trace(code: &mut Rc<Node>) -> Hist {
-    let mut sim = LRUStack::<usize>::new();
+pub fn trace(code: &mut Rc<Node>, lru_type: &str, accesses_count: &mut list_accesses) -> Hist {
+
+	let mut sim: Box<dyn LRU<usize>> = if lru_type == "Vec" {
+        Box::new(LRUVec::<usize>::new())
+    } else {
+        Box::new(LRUStack::<usize>::new())
+    };
+
     let mut hist = Hist::new();
     set_arybase( code );
     println!("{:?}", code);
-    trace_rec(code, &Vec::<i32>::new(), &mut sim, &mut hist);
+    trace_rec(code, &Vec::<i32>::new(), &mut sim, &mut hist, accesses_count);
     hist
 }
 
@@ -73,7 +84,7 @@ mod test {
         let mut aloop = Node::new_single_loop("i", 0, 10);
         Node::extend_loop_body(&mut aloop, &mut aref);
 
-	let hist = trace(&mut aloop);
+	let hist = trace(&mut aloop, "Stack", &mut list_accesses::new());
 	assert_eq!(hist.to_vec()[0], (None, 10));
 	println!("{}", hist);	
     }
@@ -86,7 +97,7 @@ mod test {
         let mut aloop = Node::new_single_loop("i", 0, 10);
         Node::extend_loop_body(&mut aloop, &mut aref);
 
-	let hist = trace(&mut aloop);
+	let hist = trace(&mut aloop, "Stack", &mut list_accesses::new());
 	assert_eq!(hist.to_vec()[0], (Some(1), 9));
 	assert_eq!(hist.to_vec()[1], (None, 1));
 	println!("{}", hist);	

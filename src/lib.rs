@@ -1,4 +1,4 @@
 #![feature(get_mut_unchecked)]
 
-mod trace;
+pub mod trace;
 
