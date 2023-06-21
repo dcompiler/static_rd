@@ -78,7 +78,7 @@ mod test {
     #[test]
     fn loop_a_i() {
 
-        // i = 0, n { a[i] }
+        // i = 0, 10 { a[i] }
         let mut aref = Node::new_ref("A", vec![10],
 				      |i| vec![i[0] as usize]);
         let mut aloop = Node::new_single_loop("i", 0, 10);
@@ -92,7 +92,7 @@ mod test {
     #[test]
     fn loop_a_0() {
 
-        // i = 0, n { a[0] }
+        // i = 0, 10 { a[0] }
         let mut aref = Node::new_ref("A", vec![1], |_| vec![0]);
         let mut aloop = Node::new_single_loop("i", 0, 10);
         Node::extend_loop_body(&mut aloop, &mut aref);
